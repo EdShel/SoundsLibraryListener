@@ -1,6 +1,7 @@
 import "./App.css";
 import { useEffect, useRef, useState } from "react";
 import { soundFiles } from "./sounds";
+import { AnnotationModal } from "./AnnotationModal";
 
 const soundsDirectory = `/assets/sounds/`;
 
@@ -13,7 +14,10 @@ function App() {
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [annotations, setAnnotations] = useState<Record<string, string>>({});
   const [duration, setDuration] = useState(0);
+  const [showAnnotationModal, setShowAnnotationModal] = useState(false);
+  const [annotationText, setAnnotationText] = useState("");
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentSoundItemRef = useRef<HTMLLIElement>(null);
 
@@ -35,6 +39,14 @@ function App() {
     }
   }, []);
 
+  // Load annotations from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("audioAnnotations");
+    if (stored) {
+      setAnnotations(JSON.parse(stored));
+    }
+  }, []);
+
   // Auto-play when current sound changes
   useEffect(() => {
     if (sounds.length > 0 && audioRef.current) {
@@ -52,6 +64,8 @@ function App() {
 
   // Keyboard controls
   useEffect(() => {
+    if (showAnnotationModal) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (sounds.length === 0) return;
 
@@ -77,6 +91,10 @@ function App() {
           e.preventDefault();
           toggleFavorite();
           break;
+        case "Enter":
+          e.preventDefault();
+          openAnnotationModal();
+          break;
         default:
           break;
       }
@@ -84,7 +102,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [sounds, currentIndex, favorites]);
+  }, [sounds, currentIndex, favorites, showAnnotationModal]);
 
   // Scroll to current sound item
   useEffect(() => {
@@ -115,6 +133,34 @@ function App() {
     );
   };
 
+  const openAnnotationModal = () => {
+    if (sounds.length === 0) return;
+    const currentSound = sounds[currentIndex].name;
+    setAnnotationText(annotations[currentSound] || "");
+    setShowAnnotationModal(true);
+  };
+
+  const closeAnnotationModal = () => {
+    setShowAnnotationModal(false);
+    setAnnotationText("");
+  };
+
+  const saveAnnotation = (text: string) => {
+    if (sounds.length === 0) return;
+    const currentSound = sounds[currentIndex].name;
+    const newAnnotations = { ...annotations };
+
+    if (text.trim()) {
+      newAnnotations[currentSound] = text;
+    } else {
+      delete newAnnotations[currentSound];
+    }
+
+    setAnnotations(newAnnotations);
+    localStorage.setItem("audioAnnotations", JSON.stringify(newAnnotations));
+    closeAnnotationModal();
+  };
+
   const formatTime = (seconds: number) => {
     if (!seconds || isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
@@ -127,10 +173,17 @@ function App() {
       <audio ref={audioRef} onLoadedMetadata={handleLoadedMetadata} />
 
       <div className="player">
-        <h1>Audio Listener</h1>
+        <h1>
+          {currentIndex + 1} / {sounds.length}
+        </h1>
         {sounds.length > 0 && (
           <div className="current-sound">
             <h2>{sounds[currentIndex].name}</h2>
+            {annotations[sounds[currentIndex].name] && (
+              <p className="annotation">
+                {annotations[sounds[currentIndex].name]}
+              </p>
+            )}
             <p className="duration">Duration: {formatTime(duration)}</p>
           </div>
         )}
@@ -138,7 +191,8 @@ function App() {
 
       <div className="controls">
         <p className="hint">
-          ↑ Previous | ↓ Next | ← Start | → or F Toggle Favorite
+          ↑ Previous | ↓ Next | ← Start | → or F Toggle Favorite | Enter
+          Annotate
         </p>
       </div>
 
@@ -153,11 +207,25 @@ function App() {
               onClick={() => setCurrentIndex(index)}
             >
               <span>{sound.name}</span>
+              {annotations[sound.name] && (
+                <div className="annotation-preview">
+                  {annotations[sound.name]}
+                </div>
+              )}
               {favorites.has(sound.name) && <span className="favorite">★</span>}
             </li>
           ))}
         </ul>
       </div>
+
+      {showAnnotationModal && (
+        <AnnotationModal
+          soundName={sounds[currentIndex]?.name || ""}
+          initialText={annotationText}
+          onSave={saveAnnotation}
+          onClose={closeAnnotationModal}
+        />
+      )}
     </div>
   );
 }
