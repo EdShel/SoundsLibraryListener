@@ -37,7 +37,7 @@ export function AnnotationModal({
     <FocusTrap>
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <h3>Annotate: {soundName}</h3>
+          <h3 style={{ color: "black" }}>Annotate: {soundName}</h3>
           <input
             ref={inputRef}
             type="text"

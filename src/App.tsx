@@ -1,5 +1,5 @@
 import "./App.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { List } from "react-virtualized";
 import { soundFiles } from "./sounds";
 import { AnnotationModal } from "./AnnotationModal";
@@ -12,51 +12,63 @@ interface Sound {
   path: string;
 }
 
-function App() {
-  const [sounds, setSounds] = useState<Sound[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [annotations, setAnnotations] = useState<Record<string, string>>({});
-  const [duration, setDuration] = useState(0);
-  const [showAnnotationModal, setShowAnnotationModal] = useState(false);
-  const [annotationText, setAnnotationText] = useState("");
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const currentSoundItemRef = useRef<HTMLLIElement>(null);
-  const listRef = useRef<List>(null);
+interface Filter {
+  text: string;
+  favoritesAndAnnotatedOnly: boolean;
+}
 
-  // Load sounds from imported soundFiles
-  useEffect(() => {
-    const loadedSounds: Sound[] = soundFiles.map((file) => ({
+function App() {
+  const [allSounds] = useState<Sound[]>(() => {
+    return soundFiles.map((file) => ({
       name: file.replace(/\.[^/.]+$/, ""),
       path: soundsDirectory + file,
     }));
+  });
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [favorites, setFavorites] = useState<Set<string>>(() =>
+    localStorage.getItem("audioFavorites")
+      ? new Set(JSON.parse(localStorage.getItem("audioFavorites")!))
+      : new Set()
+  );
+  const [annotations, setAnnotations] = useState<Record<string, string>>(() =>
+    localStorage.getItem("audioAnnotations")
+      ? JSON.parse(localStorage.getItem("audioAnnotations")!)
+      : {}
+  );
+  const [duration, setDuration] = useState(0);
+  const [showAnnotationModal, setShowAnnotationModal] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const listRef = useRef<List>(null);
+  const [filter, setFilter] = useState<Filter>({
+    text: "",
+    favoritesAndAnnotatedOnly: false,
+  });
 
-    setSounds(loadedSounds);
-  }, []);
+  const filteredSounds = useMemo(() => {
+    const normalizedFilter = filter.text.toLowerCase();
+    return allSounds.filter((sound) => {
+      const matchesText =
+        sound.name.toLowerCase().includes(normalizedFilter) ||
+        (annotations[sound.name] &&
+          annotations[sound.name].toLowerCase().includes(normalizedFilter));
+      if (!matchesText) return false;
 
-  // Load favorites from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem("audioFavorites");
-    if (stored) {
-      setFavorites(new Set(JSON.parse(stored)));
-    }
-  }, []);
+      if (filter.favoritesAndAnnotatedOnly) {
+        return favorites.has(sound.name) || annotations[sound.name];
+      }
 
-  // Load annotations from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem("audioAnnotations");
-    if (stored) {
-      setAnnotations(JSON.parse(stored));
-    }
-  }, []);
+      return true;
+    });
+  }, [allSounds, filter, favorites, annotations]);
 
   // Auto-play when current sound changes
   useEffect(() => {
-    if (sounds.length > 0 && audioRef.current) {
-      audioRef.current.src = sounds[currentIndex].path;
+    if (filteredSounds.length > 0 && audioRef.current) {
+      const currentSound = filteredSounds[currentIndex];
+      audioRef.current.src = currentSound.path;
       audioRef.current.play().catch(() => {});
     }
-  }, [currentIndex, sounds]);
+  }, [currentIndex, filteredSounds]);
 
   // Update duration when metadata loads
   const handleLoadedMetadata = () => {
@@ -65,62 +77,10 @@ function App() {
     }
   };
 
-  // Keyboard controls
-  useEffect(() => {
-    if (showAnnotationModal) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (sounds.length === 0) return;
-
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          setCurrentIndex((prev) => {
-            const n = (prev + 1) % sounds.length;
-            listRef.current?.scrollToRow(Math.min(n + 5, sounds.length - 1));
-            return n;
-          });
-
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          setCurrentIndex((prev) => {
-            const n = (prev - 1 + sounds.length) % sounds.length;
-            listRef.current?.scrollToRow(Math.max(0, n - 5));
-            return n;
-          });
-
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          if (audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play();
-          }
-          break;
-        case "ArrowRight":
-        case "f":
-        case "F":
-          e.preventDefault();
-          toggleFavorite();
-          break;
-        case "Enter":
-          e.preventDefault();
-          openAnnotationModal();
-          break;
-        default:
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [sounds, currentIndex, favorites, showAnnotationModal]);
-
   const toggleFavorite = () => {
-    if (sounds.length === 0) return;
+    if (filteredSounds.length === 0) return;
 
-    const currentSound = sounds[currentIndex].name;
+    const currentSound = filteredSounds[currentIndex].name;
     const newFavorites = new Set(favorites);
 
     if (newFavorites.has(currentSound)) {
@@ -137,20 +97,75 @@ function App() {
   };
 
   const openAnnotationModal = () => {
-    if (sounds.length === 0) return;
-    const currentSound = sounds[currentIndex].name;
-    setAnnotationText(annotations[currentSound] || "");
+    if (filteredSounds.length === 0) return;
     setShowAnnotationModal(true);
   };
 
   const closeAnnotationModal = () => {
     setShowAnnotationModal(false);
-    setAnnotationText("");
   };
 
+  // Keyboard controls
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (filteredSounds.length === 0) return;
+    if (
+      document.activeElement &&
+      (document.activeElement.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA")
+    ) {
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setCurrentIndex((prev) => {
+          const n = (prev + 1) % filteredSounds.length;
+          listRef.current?.scrollToRow(
+            Math.min(n + 5, filteredSounds.length - 1)
+          );
+          return n;
+        });
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setCurrentIndex((prev) => {
+          const n = (prev - 1 + filteredSounds.length) % filteredSounds.length;
+          listRef.current?.scrollToRow(Math.max(0, n - 5));
+          return n;
+        });
+        break;
+      case "ArrowLeft":
+        e.preventDefault();
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play();
+        }
+        break;
+      case "ArrowRight":
+      case "f":
+      case "F":
+        e.preventDefault();
+        toggleFavorite();
+        break;
+      case "Enter":
+        e.preventDefault();
+        openAnnotationModal();
+        break;
+      default:
+        break;
+    }
+  };
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   const saveAnnotation = (text: string) => {
-    if (sounds.length === 0) return;
-    const currentSound = sounds[currentIndex].name;
+    if (filteredSounds.length === 0) return;
+    const currentSound = filteredSounds[currentIndex].name;
     const newAnnotations = { ...annotations };
 
     if (text.trim()) {
@@ -180,13 +195,21 @@ function App() {
     key: string;
     style: React.CSSProperties;
   }) => {
-    const sound = sounds[index];
+    const sound = filteredSounds[index];
     return (
       <li
         key={key}
         style={style}
         className={`sound-item ${index === currentIndex ? "active" : ""}`}
-        onClick={() => setCurrentIndex(index)}
+        onClick={() => {
+          setCurrentIndex(index);
+          if (index === currentIndex) {
+            if (audioRef.current) {
+              audioRef.current.currentTime = 0;
+              audioRef.current.play();
+            }
+          }
+        }}
       >
         <span>
           {sound.name}
@@ -208,15 +231,15 @@ function App() {
 
       <div className="player">
         <h1>
-          {currentIndex + 1} / {sounds.length}
+          {currentIndex + 1} / {filteredSounds.length}
         </h1>
-        {sounds.length > 0 && (
+        {filteredSounds.length > 0 && (
           <div className="current-sound">
             <h2>
-              {sounds[currentIndex].name}
-              {annotations[sounds[currentIndex].name] && (
+              {filteredSounds[currentIndex].name}
+              {annotations[filteredSounds[currentIndex].name] && (
                 <span className="annotation">
-                  {annotations[sounds[currentIndex].name]}
+                  {annotations[filteredSounds[currentIndex].name]}
                 </span>
               )}
             </h2>
@@ -225,30 +248,57 @@ function App() {
         )}
       </div>
 
-      <div className="controls">
-        <p className="hint">
-          ↑ Previous | ↓ Next | ← Start | → or F Toggle Favorite | Enter
-          Annotate
-        </p>
+      <div className="filter-controls">
+        <input
+          type="text"
+          placeholder="Search sounds..."
+          value={filter.text}
+          onKeyDown={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setFilter({ ...filter, text: e.target.value });
+            setCurrentIndex(0);
+          }}
+          className="filter-input"
+        />
+        <label className="filter-checkbox">
+          <input
+            type="checkbox"
+            checked={filter.favoritesAndAnnotatedOnly}
+            onChange={(e) => {
+              setFilter({
+                ...filter,
+                favoritesAndAnnotatedOnly: e.target.checked,
+              });
+              setCurrentIndex(0);
+            }}
+          />
+          Favorites & Annotated Only
+        </label>
       </div>
 
       <div className="sound-list">
-        {sounds.length > 0 && (
+        {filteredSounds.length > 0 && (
           <List
             ref={listRef}
-            width={640}
-            height={530}
-            rowCount={sounds.length}
+            width={600}
+            height={500}
+            rowCount={filteredSounds.length}
             rowHeight={ITEM_HEIGHT}
             rowRenderer={renderSoundItem}
           />
         )}
       </div>
 
+      <div className="controls">
+        ↑ Previous | ↓ Next | ← Start | → or F Toggle Favorite | Enter Annotate
+      </div>
+
       {showAnnotationModal && (
         <AnnotationModal
-          soundName={sounds[currentIndex]?.name || ""}
-          initialText={annotationText}
+          soundName={filteredSounds[currentIndex]?.name || ""}
+          initialText={annotations[filteredSounds[currentIndex]?.name] || ""}
           onSave={saveAnnotation}
           onClose={closeAnnotationModal}
         />
