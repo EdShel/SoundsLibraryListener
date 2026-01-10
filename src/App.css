@@ -1,0 +1,99 @@
+#root {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.app {
+  max-width: 600px;
+  padding: 20px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.player {
+  position: sticky;
+  top: 0;
+  background: #1e1e1e;
+  color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.player h1 {
+  margin: 0 0 20px 0;
+  font-size: 24px;
+}
+
+.current-sound h2 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  word-break: break-word;
+}
+
+.duration {
+  margin: 0;
+  color: #aaa;
+  font-size: 14px;
+}
+
+.controls {
+  background: #f0f0f0;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.sound-list {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.sound-list h3 {
+  margin: 0 0 15px 0;
+}
+
+.sound-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sound-item {
+  padding: 10px;
+  margin: 5px 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  color: black;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.2s;
+}
+
+.sound-item:hover {
+  background: #f0f0f0;
+}
+
+.sound-item.active {
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
+  font-weight: bold;
+}
+
+.favorite {
+  color: gold;
+  font-size: 16px;
+}
