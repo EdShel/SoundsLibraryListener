@@ -1,9 +1,11 @@
 import "./App.css";
 import { useEffect, useRef, useState } from "react";
+import { List } from "react-virtualized";
 import { soundFiles } from "./sounds";
 import { AnnotationModal } from "./AnnotationModal";
 
 const soundsDirectory = `/assets/sounds/`;
+const ITEM_HEIGHT = 60;
 
 interface Sound {
   name: string;
@@ -20,6 +22,7 @@ function App() {
   const [annotationText, setAnnotationText] = useState("");
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentSoundItemRef = useRef<HTMLLIElement>(null);
+  const listRef = useRef<List>(null);
 
   // Load sounds from imported soundFiles
   useEffect(() => {
@@ -106,13 +109,10 @@ function App() {
 
   // Scroll to current sound item
   useEffect(() => {
-    if (currentSoundItemRef.current) {
-      currentSoundItemRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+    if (listRef.current && sounds.length > 0) {
+      listRef.current.scrollToRow(Math.max(0, currentIndex - 5));
     }
-  }, [currentIndex]);
+  }, [currentIndex, sounds.length]);
 
   const toggleFavorite = () => {
     if (sounds.length === 0) return;
@@ -168,6 +168,37 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const renderSoundItem = ({
+    index,
+    key,
+    style,
+  }: {
+    index: number;
+    key: string;
+    style: React.CSSProperties;
+  }) => {
+    const sound = sounds[index];
+    return (
+      <li
+        key={key}
+        style={style}
+        className={`sound-item ${index === currentIndex ? "active" : ""}`}
+        onClick={() => setCurrentIndex(index)}
+      >
+        <span>
+          {sound.name}
+
+          {annotations[sound.name] && (
+            <span className="annotation-preview">
+              {annotations[sound.name]}
+            </span>
+          )}
+        </span>
+        {favorites.has(sound.name) && <span className="favorite">★</span>}
+      </li>
+    );
+  };
+
   return (
     <div className="app">
       <audio ref={audioRef} onLoadedMetadata={handleLoadedMetadata} />
@@ -178,12 +209,14 @@ function App() {
         </h1>
         {sounds.length > 0 && (
           <div className="current-sound">
-            <h2>{sounds[currentIndex].name}</h2>
-            {annotations[sounds[currentIndex].name] && (
-              <p className="annotation">
-                {annotations[sounds[currentIndex].name]}
-              </p>
-            )}
+            <h2>
+              {sounds[currentIndex].name}
+              {annotations[sounds[currentIndex].name] && (
+                <span className="annotation">
+                  {annotations[sounds[currentIndex].name]}
+                </span>
+              )}
+            </h2>
             <p className="duration">Duration: {formatTime(duration)}</p>
           </div>
         )}
@@ -197,25 +230,16 @@ function App() {
       </div>
 
       <div className="sound-list">
-        <h3>Sounds</h3>
-        <ul>
-          {sounds.map((sound, index) => (
-            <li
-              key={sound.path}
-              ref={index === currentIndex ? currentSoundItemRef : null}
-              className={`sound-item ${index === currentIndex ? "active" : ""}`}
-              onClick={() => setCurrentIndex(index)}
-            >
-              <span>{sound.name}</span>
-              {annotations[sound.name] && (
-                <div className="annotation-preview">
-                  {annotations[sound.name]}
-                </div>
-              )}
-              {favorites.has(sound.name) && <span className="favorite">★</span>}
-            </li>
-          ))}
-        </ul>
+        {sounds.length > 0 && (
+          <List
+            ref={listRef}
+            width={640}
+            height={530}
+            rowCount={sounds.length}
+            rowHeight={ITEM_HEIGHT}
+            rowRenderer={renderSoundItem}
+          />
+        )}
       </div>
 
       {showAnnotationModal && (

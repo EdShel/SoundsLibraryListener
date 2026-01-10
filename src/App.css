@@ -52,26 +52,17 @@
   color: #666;
 }
 
-.sound-list {
+.sound-list > * {
   background: #f9f9f9;
   padding: 20px;
   border-radius: 8px;
-}
-
-.sound-list h3 {
-  margin: 0 0 15px 0;
-}
-
-.sound-list ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+  overflow-y: hidden;
+  width: 640px;
 }
 
 .sound-item {
   position: relative;
   padding: 10px;
-  margin: 5px 0;
   background: #fff;
   border: 1px solid #ddd;
   color: black;
@@ -81,6 +72,8 @@
   justify-content: space-between;
   align-items: center;
   transition: background 0.2s;
+  box-sizing: border-box;
+  height: 60px;
 }
 
 .sound-item:hover {
@@ -103,16 +96,14 @@
   font-size: 0.9rem;
   color: #888;
   font-style: italic;
-  margin-top: 0.5rem;
+  margin-left: 0.5rem;
 }
 
 .annotation-preview {
-  position: absolute;
-  left: calc(100% + 52px);
   font-size: 0.85rem;
-  color: #fff;
   font-style: italic;
   margin-top: 0.25rem;
+  margin-left: 16px;
 }
 
 .modal-overlay {
