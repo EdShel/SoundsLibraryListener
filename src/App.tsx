@@ -1,5 +1,5 @@
 import "./App.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { List } from "react-virtualized";
 import { soundFiles } from "./sounds";
 import { AnnotationModal } from "./AnnotationModal";
@@ -106,7 +106,7 @@ function App() {
   };
 
   // Keyboard controls
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (filteredSounds.length === 0) return;
     if (
       document.activeElement &&
@@ -155,7 +155,7 @@ function App() {
       default:
         break;
     }
-  };
+  });
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -236,8 +236,8 @@ function App() {
         {filteredSounds.length > 0 && (
           <div className="current-sound">
             <h2>
-              {filteredSounds[currentIndex].name}
-              {annotations[filteredSounds[currentIndex].name] && (
+              {filteredSounds[currentIndex]?.name}
+              {annotations[filteredSounds[currentIndex]?.name] && (
                 <span className="annotation">
                   {annotations[filteredSounds[currentIndex].name]}
                 </span>
