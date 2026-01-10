@@ -75,11 +75,21 @@ function App() {
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setCurrentIndex((prev) => (prev + 1) % sounds.length);
+          setCurrentIndex((prev) => {
+            const n = (prev + 1) % sounds.length;
+            listRef.current?.scrollToRow(Math.min(n + 5, sounds.length - 1));
+            return n;
+          });
+
           break;
         case "ArrowUp":
           e.preventDefault();
-          setCurrentIndex((prev) => (prev - 1 + sounds.length) % sounds.length);
+          setCurrentIndex((prev) => {
+            const n = (prev - 1 + sounds.length) % sounds.length;
+            listRef.current?.scrollToRow(Math.max(0, n - 5));
+            return n;
+          });
+
           break;
         case "ArrowLeft":
           e.preventDefault();
@@ -106,13 +116,6 @@ function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [sounds, currentIndex, favorites, showAnnotationModal]);
-
-  // Scroll to current sound item
-  useEffect(() => {
-    if (listRef.current && sounds.length > 0) {
-      listRef.current.scrollToRow(Math.max(0, currentIndex - 5));
-    }
-  }, [currentIndex, sounds.length]);
 
   const toggleFavorite = () => {
     if (sounds.length === 0) return;
