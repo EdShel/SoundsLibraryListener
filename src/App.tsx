@@ -17,6 +17,8 @@ interface Filter {
   favoritesAndAnnotatedOnly: boolean;
 }
 
+const messasgeEmitter = createEventEmitter<string>();
+
 function App() {
   const [allSounds] = useState<Sound[]>(() => {
     return soundFiles.map((file) => ({
@@ -201,7 +203,17 @@ function App() {
         key={key}
         style={style}
         className={`sound-item ${index === currentIndex ? "active" : ""}`}
-        onClick={() => {
+        onClick={(ev) => {
+          if (ev.ctrlKey) {
+            // copy sound file name to clipboard
+            const fileName = sound.path.split("/").pop() || sound.path;
+            navigator.clipboard.writeText(fileName);
+            messasgeEmitter.emit(
+              `Copied file name to clipboard: "${fileName}"`
+            );
+            return;
+          }
+
           setCurrentIndex(index);
           if (index === currentIndex) {
             if (audioRef.current) {
@@ -303,8 +315,68 @@ function App() {
           onClose={closeAnnotationModal}
         />
       )}
+
+      <MessagePopup />
     </div>
   );
 }
 
 export default App;
+
+function createEventEmitter<TArg>() {
+  type EventHandler = (arg: TArg) => void;
+  const handlers: EventHandler[] = [];
+
+  return {
+    subscribe: (handler: EventHandler) => {
+      handlers.push(handler);
+      return () => {
+        const index = handlers.indexOf(handler);
+        if (index !== -1) {
+          handlers.splice(index, 1);
+        }
+      };
+    },
+    emit: (arg: TArg) => {
+      handlers.forEach((handler) => handler(arg));
+    },
+  };
+}
+
+const MessagePopup = () => {
+  const [currentMessage, setCurrentMessage] = useState<string>("");
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = messasgeEmitter.subscribe((message) => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+
+      setCurrentMessage(message);
+      timeout = setTimeout(() => setCurrentMessage(""), 5000);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  if (!currentMessage) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 10,
+        left: "50%",
+        transform: "translateX(-50%)",
+        backgroundColor: "rgba(0,0,0,0.7)",
+        color: "white",
+        padding: "10px",
+        borderRadius: "5px",
+      }}
+    >
+      {currentMessage}
+    </div>
+  );
+};
